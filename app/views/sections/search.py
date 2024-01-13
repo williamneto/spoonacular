@@ -1,7 +1,7 @@
 import requests
 
 from reactpy import component, use_state, html, use_effect
-from reactpy_material import grid, text_field, button, icon, typography
+from reactpy_material import grid, text_field, button, icon, typography, stack, pagination
 
 from configs import API_KEY, API_HOST
 def get_req_headers():
@@ -15,21 +15,23 @@ def Search():
     search_text, set_search_text = use_state("")
     recipes, set_recipes = use_state([])
 
-    def handle_text_change(event):
-        set_search_text(event["target"]["value"])
-    
-    def handle_search(event):
+    pg_count, set_pg_count = use_state(0)
+    pg_page, set_pg_page = use_state(1)
+
+    def call_search(offset):
         response = requests.get(
             f"https://{API_HOST}/recipes/complexSearch",
             headers=get_req_headers(),
             params={
-                "query": search_text
+                "query": search_text,
+                "offset": offset
             }
         )
 
         if response.status_code == 200:
             response_data = response.json()
             set_recipes(response_data["results"])
+            set_pg_count(response_data["totalResults"])
     
     def render_recipes():
         result = []
@@ -61,6 +63,22 @@ def Search():
         
         return result
 
+    def handle_page_change(e, pg):
+        set_pg_page(pg)
+
+        call_search(10*(pg-1))
+    
+    def render_pagination():
+        return stack(
+            pagination(
+                attrs={
+                    "count": pg_count,
+                    "page": pg_page,
+                    "onChange": handle_page_change
+                }
+            )
+        )
+
     return grid(
         grid(
             text_field(
@@ -84,7 +102,7 @@ def Search():
                     "fullheight": "true",
                     "variant": "outlined",
                     "size": "large",
-                    "onClick": handle_search
+                    "onClick": lambda e: call_search(0)
                 }
             ),
             attrs={
@@ -94,6 +112,7 @@ def Search():
         ),
         grid(
             *render_recipes(),
+            render_pagination(),
             attrs={
                 "container": True
             }
